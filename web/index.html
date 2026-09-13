@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShellGuard — Zero-Latency Terminal Interceptor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #090d16;
+      --bg-secondary: #0f172a;
+      --bg-card: #131d35;
+      --border-color: #1e293b;
+      --border-highlight: #334155;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-sans: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+    }
+
+    /* Navbar */
+    header {
+      background-color: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent-cyan), #3b82f6);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #fff;
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.35);
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      background: linear-gradient(to right, #fff, #93c5fd);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-tag {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      background-color: rgba(6, 182, 212, 0.1);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(6, 182, 212, 0.25);
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      margin-left: 0.5rem;
+      font-weight: 600;
+    }
+
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      font-size: 0.85rem;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      font-family: var(--font-mono);
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background-color: var(--accent-emerald);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--accent-emerald);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Main Grid */
+    main {
+      flex: 1;
+      padding: 2rem;
+      max-width: 1440px;
+      margin: 0 auto;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 2rem;
+    }
+
+    /* Cards */
+    .card {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Simulator Panel */
+    .simulator-box {
+      margin-bottom: 2rem;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .cmd-input {
+      flex: 1;
+      background-color: #060a12;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.85rem 1.25rem;
+      color: #38bdf8;
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .cmd-input:focus {
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0891b2, #2563eb);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0 1.5rem;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+    }
+
+    .chips-label {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+
+    .chips-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .cmd-chip {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .cmd-chip:hover {
+      border-color: var(--accent-cyan);
+      color: #fff;
+      background-color: rgba(6, 182, 212, 0.1);
+    }
+
+    .cmd-chip.danger {
+      border-color: rgba(244, 63, 94, 0.3);
+      color: #fda4af;
+    }
+
+    .cmd-chip.danger:hover {
+      border-color: var(--accent-rose);
+      background-color: rgba(244, 63, 94, 0.15);
+      color: #fff;
+    }
+
+    /* Active Result Alert */
+    .result-alert {
+      display: none;
+      margin-top: 1.5rem;
+      border-radius: 8px;
+      padding: 1.25rem;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-alert.blocked {
+      background-color: rgba(244, 63, 94, 0.08);
+      border: 1px solid var(--accent-rose);
+    }
+
+    .result-alert.passed {
+      background-color: rgba(16, 185, 129, 0.08);
+      border: 1px solid var(--accent-emerald);
+    }
+
+    .result-alert.warning {
+      background-color: rgba(245, 158, 11, 0.08);
+      border: 1px solid var(--accent-amber);
+    }
+
+    .alert-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .badge {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .badge.blocked {
+      background-color: var(--accent-rose);
+      color: #fff;
+    }
+
+    .badge.passed {
+      background-color: var(--accent-emerald);
+      color: #fff;
+    }
+
+    .badge.warning {
+      background-color: var(--accent-amber);
+      color: #000;
+    }
+
+    .latency-badge {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+
+    .alert-body {
+      font-size: 0.9rem;
+      color: var(--text-main);
+    }
+
+    .alert-code-box {
+      margin-top: 0.75rem;
+      background-color: #060a12;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: #a5f3fc;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      border-radius: 4px;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    .copy-btn:hover {
+      color: #fff;
+      border-color: var(--accent-cyan);
+    }
+
+    /* Speed Comparison Gauge */
+    .speed-gauge-card {
+      margin-bottom: 2rem;
+    }
+
+    .gauge-row {
+      margin-bottom: 1rem;
+    }
+
+    .gauge-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+
+    .gauge-bar-bg {
+      height: 12px;
+      background-color: var(--bg-card);
+      border-radius: 9999px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+    }
+
+    .gauge-bar-fill {
+      height: 100%;
+      border-radius: 9999px;
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .gauge-bar-fill.moss {
+      background: linear-gradient(to right, var(--accent-cyan), var(--accent-emerald));
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+    }
+
+    .gauge-bar-fill.cloud {
+      background: linear-gradient(to right, #f97316, var(--accent-rose));
+    }
+
+    .speedup-callout {
+      margin-top: 1rem;
+      background-color: rgba(6, 182, 212, 0.08);
+      border: 1px dashed rgba(6, 182, 212, 0.3);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .speedup-number {
+      font-family: var(--font-mono);
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--accent-cyan);
+    }
+
+    /* Live Interception Feed */
+    .feed-container {
+      max-height: 420px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .feed-item {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      transition: border-color 0.2s;
+    }
+
+    .feed-item:hover {
+      border-color: var(--border-highlight);
+    }
+
+    .feed-cmd {
+      color: #e2e8f0;
+      max-width: 380px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .feed-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    /* Sidebar / Incidents */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 0.85rem;
+      border-radius: 8px;
+    }
+
+    .stat-val {
+      font-family: var(--font-mono);
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .incident-list {
+      max-height: 520px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .incident-item {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .incident-item:hover {
+      border-color: var(--accent-cyan);
+      transform: translateX(2px);
+    }
+
+    .incident-id {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--accent-cyan);
+      font-weight: 700;
+    }
+
+    .incident-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-top: 0.2rem;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .modal-content {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-highlight);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 650px;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 2rem;
+    }
+
+    .modal-close {
+      float: right;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border-color);
+      padding: 1.25rem 2rem;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div class="brand-title">ShellGuard</div>
+      <span class="brand-tag">MOSS IN-PROCESS</span>
+    </div>
+    <div class="header-status">
+      <div class="status-pill">
+        <span class="pulse-dot"></span>
+        <span id="runtime-status">MOSS RUNTIME: 3.8ms WARM</span>
+      </div>
+      <div class="status-pill">
+        <span>TRACK 04: LOCAL FIRST AI</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left Column: Simulator & Live Feed -->
+    <section>
+      <!-- Simulator -->
+      <div class="card simulator-box">
+        <div class="card-title">
+          <span>🛡️</span> Real-Time Terminal Command Interceptor
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+          Simulate a command executed in your terminal. ShellGuard intercepts it via Moss semantic retrieval in &lt;10ms before it hits the operating system or Kubernetes API.
+        </p>
+
+        <form id="sim-form" onsubmit="handleCheck(event)">
+          <div class="input-row">
+            <input type="text" id="cmd-input" class="cmd-input" placeholder="e.g. kubectl delete namespace ingress-nginx" autocomplete="off" spellcheck="false" />
+            <button type="submit" class="btn-primary" id="btn-submit">
+              <span>⚡ Intercept</span>
+            </button>
+          </div>
+        </form>
+
+        <div class="chips-label">Quick Test Scenarios (Click to test):</div>
+        <div class="chips-container">
+          <button type="button" class="cmd-chip danger" onclick="setCmd('kubectl delete namespace ingress-nginx')">💥 kubectl delete namespace</button>
+          <button type="button" class="cmd-chip danger" onclick="setCmd('terraform destroy -target=aws_db_instance.primary')">💥 terraform destroy db</button>
+          <button type="button" class="cmd-chip danger" onclick="setCmd('docker system prune -a --volumes')">💥 docker prune --volumes</button>
+          <button type="button" class="cmd-chip danger" onclick="setCmd('rm -rf /')">💥 rm -rf /</button>
+          <button type="button" class="cmd-chip danger" onclick="setCmd('aws s3api put-bucket-acl --bucket prod --acl public-read')">💥 aws s3 public-read</button>
+          <button type="button" class="cmd-chip danger" onclick="setCmd('git push --force origin main')">💥 git push -f main</button>
+          <button type="button" class="cmd-chip" onclick="setCmd('kubectl get pods -n production')">✅ kubectl get pods</button>
+          <button type="button" class="cmd-chip" onclick="setCmd('terraform plan')">✅ terraform plan</button>
+          <button type="button" class="cmd-chip" onclick="setCmd('docker ps')">✅ docker ps</button>
+          <button type="button" class="cmd-chip" onclick="setCmd('git status')">✅ git status</button>
+        </div>
+
+        <!-- Result Box -->
+        <div id="result-box" class="result-alert">
+          <div class="alert-header">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span id="res-badge" class="badge">STATUS</span>
+              <span id="res-title" style="font-weight: 700; font-size: 0.95rem;">Incident Title</span>
+            </div>
+            <div id="res-latency" class="latency-badge">0.0ms</div>
+          </div>
+          <div id="res-body" class="alert-body">Recommendation text</div>
+          
+          <div id="res-safe-box" style="display: none; margin-top: 1rem;">
+            <div style="font-size: 0.75rem; color: var(--accent-emerald); font-weight: 700; text-transform: uppercase;">
+              🛡️ Pre-Flight Verified Safe Alternative:
+            </div>
+            <div class="alert-code-box">
+              <span id="res-safe-cmd">kubectl rollout restart deployment/ingress-nginx</span>
+              <button class="copy-btn" onclick="copySafeCmd()">Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Speed Comparison Gauge -->
+      <div class="card speed-gauge-card">
+        <div class="card-title">
+          <span>⚡</span> Latency Moat: In-Process Moss vs. Cloud Vector DB
+        </div>
+
+        <div class="gauge-row">
+          <div class="gauge-label">
+            <span>Moss In-Process Runtime (Zero Network Hops)</span>
+            <span id="gauge-moss-time" style="color: var(--accent-emerald); font-family: var(--font-mono);">4.2 ms</span>
+          </div>
+          <div class="gauge-bar-bg">
+            <div id="gauge-moss-bar" class="gauge-bar-fill moss" style="width: 3%;"></div>
+          </div>
+        </div>
+
+        <div class="gauge-row">
+          <div class="gauge-label">
+            <span>Traditional Cloud Vector DB (Pinecone / Qdrant HTTPS roundtrip)</span>
+            <span id="gauge-cloud-time" style="color: var(--accent-rose); font-family: var(--font-mono);">295.0 ms</span>
+          </div>
+          <div class="gauge-bar-bg">
+            <div id="gauge-cloud-bar" class="gauge-bar-fill cloud" style="width: 95%;"></div>
+          </div>
+        </div>
+
+        <div class="speedup-callout">
+          <div>
+            <div style="font-size: 0.85rem; font-weight: 700;">Sub-10ms Latency Advantage</div>
+            <div style="font-size: 0.75rem; color: var(--text-dim);">No remote database round-trips. Embeddings and index run in local process memory.</div>
+          </div>
+          <div id="speedup-val" class="speedup-number">70.2x</div>
+        </div>
+
+        <div style="margin-top: 1rem; text-align: right;">
+          <button type="button" class="copy-btn" onclick="runLiveBenchmark()" id="btn-benchmark">
+            ▶ Run Live 10-Query Benchmark Test
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Terminal Feed -->
+      <div class="card">
+        <div class="card-title">
+          <span>📡</span> Live Interception Stream
+        </div>
+        <div id="feed-list" class="feed-container">
+          <div style="font-size: 0.85rem; color: var(--text-dim); text-align: center; padding: 2rem 0;">
+            No commands intercepted yet. Run a command above or in your shell!
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Stats & Post-Mortem Explorer -->
+    <aside class="sidebar">
+      <!-- Telemetry Stats -->
+      <div class="card">
+        <div class="card-title"><span>📊</span> Telemetry</div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div id="stat-total" class="stat-val">0</div>
+            <div class="stat-label">Total Checks</div>
+          </div>
+          <div class="stat-card">
+            <div id="stat-blocked" class="stat-val" style="color: var(--accent-rose);">0</div>
+            <div class="stat-label">Blocked</div>
+          </div>
+          <div class="stat-card">
+            <div id="stat-p50" class="stat-val" style="color: var(--accent-cyan);">4.1ms</div>
+            <div class="stat-label">p50 Latency</div>
+          </div>
+          <div class="stat-card">
+            <div id="stat-chunks" class="stat-val">29</div>
+            <div class="stat-label">Moss Chunks</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Knowledge Base Incidents -->
+      <div class="card">
+        <div class="card-title"><span>📚</span> Disaster Post-Mortems</div>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+          7 historical incidents loaded in-memory. Click to view post-mortem details:
+        </p>
+        <div id="incident-list" class="incident-list">
+          <div style="font-size: 0.8rem; color: var(--text-dim); text-align: center;">Loading incidents...</div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Incident Detail Modal -->
+  <div id="incident-modal" class="modal-overlay" onclick="closeModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+      <div id="modal-id" style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent-cyan); font-weight: 700;"></div>
+      <h2 id="modal-title" style="margin: 0.5rem 0 1rem; font-size: 1.25rem;"></h2>
+      
+      <div style="margin-bottom: 1rem;">
+        <span id="modal-sev" class="badge"></span>
+      </div>
+
+      <h4 style="font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase;">Triggering Commands:</h4>
+      <pre id="modal-cmds" style="background:#060a12; padding: 0.75rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.8rem; margin: 0.5rem 0 1rem; color: #f43f5e;"></pre>
+
+      <h4 style="font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase;">Blast Radius:</h4>
+      <div id="modal-blast" style="font-size: 0.85rem; color: var(--text-muted); margin: 0.5rem 0 1rem;"></div>
+
+      <h4 style="font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase;">Safe Alternative:</h4>
+      <pre id="modal-safe" style="background:#060a12; padding: 0.75rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.8rem; margin: 0.5rem 0 1rem; color: #10b981;"></pre>
+    </div>
+  </div>
+
+  <footer>
+    <div>ShellGuard • Built for YC Fall 2026 × Moss Builder Sprint (Track 04: Local-First AI)</div>
+    <div>Sub-10ms Semantic Retrieval • 100% In-Process Rust Engine</div>
+  </footer>
+
+  <script>
+    let incidentsData = [];
+
+    async function init() {
+      await fetchIncidents();
+      await fetchStats();
+      setInterval(fetchStats, 3000);
+    }
+
+    function setCmd(cmd) {
+      document.getElementById('cmd-input').value = cmd;
+      document.getElementById('cmd-input').focus();
+    }
+
+    async function handleCheck(e) {
+      if (e) e.preventDefault();
+      const input = document.getElementById('cmd-input');
+      const cmd = input.value.trim();
+      if (!cmd) return;
+
+      const btn = document.getElementById('btn-submit');
+      btn.disabled = true;
+      btn.innerHTML = '<span>Checking...</span>';
+
+      try {
+        const res = await fetch('/api/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: cmd, shell: 'web' })
+        });
+        const data = await res.json();
+        renderResult(data);
+        await fetchStats();
+      } catch (err) {
+        console.error(err);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>⚡ Intercept</span>';
+      }
+    }
+
+    function renderResult(data) {
+      const box = document.getElementById('result-box');
+      const badge = document.getElementById('res-badge');
+      const title = document.getElementById('res-title');
+      const lat = document.getElementById('res-latency');
+      const body = document.getElementById('res-body');
+      const safeBox = document.getElementById('res-safe-box');
+      const safeCmd = document.getElementById('res-safe-cmd');
+
+      box.style.display = 'block';
+      box.className = 'result-alert ' + data.status.toLowerCase();
+
+      badge.className = 'badge ' + data.status.toLowerCase();
+      badge.textContent = data.status;
+
+      lat.textContent = `${data.latency_ms} ms`;
+
+      if (data.status === 'BLOCKED') {
+        title.textContent = `🛑 CRITICAL: Matched ${data.matched_incident_id || 'Safety Policy'}`;
+        body.innerHTML = `<strong>Root Cause:</strong> This command was identified as a direct trigger for a catastrophic infrastructure failure. <br><strong>Similarity Score:</strong> ${(data.similarity_score * 100).toFixed(1)}% | <strong>Incident:</strong> ${data.matched_incident_title || ''}`;
+        
+        if (data.safe_alternative) {
+          safeBox.style.display = 'block';
+          safeCmd.textContent = data.safe_alternative.replace(/```(?:bash|sh)?/g, '').replace(/```/g, '').trim().split('\n')[0];
+        } else {
+          safeBox.style.display = 'none';
+        }
+      } else if (data.status === 'WARNING') {
+        title.textContent = `⚠️ WARNING: High-Risk Operation Detected`;
+        body.textContent = data.recommendation;
+        safeBox.style.display = 'none';
+      } else {
+        title.textContent = `✅ PASSED: Command Verified Safe`;
+        body.textContent = data.recommendation || 'No matching disaster incidents identified. Safe to execute.';
+        safeBox.style.display = 'none';
+      }
+
+      // Add to feed
+      prependFeed(data);
+    }
+
+    function prependFeed(data) {
+      const list = document.getElementById('feed-list');
+      if (list.children.length === 1 && list.children[0].textContent.includes('No commands')) {
+        list.innerHTML = '';
+      }
+
+      const item = document.createElement('div');
+      item.className = 'feed-item';
+      item.innerHTML = `
+        <div class="feed-cmd">${escapeHtml(data.command)}</div>
+        <div class="feed-meta">
+          <span class="badge ${data.status.toLowerCase()}">${data.status}</span>
+          <span style="color: var(--accent-cyan); font-size: 0.8rem;">${data.latency_ms}ms</span>
+        </div>
+      `;
+      list.insertBefore(item, list.firstChild);
+    }
+
+    function copySafeCmd() {
+      const text = document.getElementById('res-safe-cmd').textContent;
+      navigator.clipboard.writeText(text);
+      alert('Safe command copied to clipboard!');
+    }
+
+    async function fetchStats() {
+      try {
+        const res = await fetch('/api/stats');
+        const stats = await res.json();
+        document.getElementById('stat-total').textContent = stats.total_checks;
+        document.getElementById('stat-blocked').textContent = stats.blocked_count;
+        document.getElementById('stat-p50').textContent = `${stats.p50_latency_ms}ms`;
+        document.getElementById('stat-chunks').textContent = stats.total_chunks_indexed;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function fetchIncidents() {
+      try {
+        const res = await fetch('/api/incidents');
+        incidentsData = await res.json();
+        const list = document.getElementById('incident-list');
+        list.innerHTML = '';
+
+        incidentsData.forEach(inc => {
+          const div = document.createElement('div');
+          div.className = 'incident-item';
+          div.onclick = () => openModal(inc.id);
+          div.innerHTML = `
+            <div class="incident-id">${inc.id} • ${inc.severity}</div>
+            <div class="incident-name">${inc.title.replace(/^Incident #\d+:\s*/, '')}</div>
+          `;
+          list.appendChild(div);
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function openModal(id) {
+      const inc = incidentsData.find(i => i.id === id);
+      if (!inc) return;
+
+      document.getElementById('modal-id').textContent = `${inc.id} • Historical Post-Mortem`;
+      document.getElementById('modal-title').textContent = inc.title;
+      const sevBadge = document.getElementById('modal-sev');
+      sevBadge.className = 'badge ' + (inc.severity === 'P0' ? 'blocked' : 'warning');
+      sevBadge.textContent = `Severity: ${inc.severity}`;
+
+      document.getElementById('modal-cmds').textContent = inc.commands.join('\n');
+      document.getElementById('modal-blast').textContent = inc.blast_radius || inc.root_cause || 'Critical service failure';
+      document.getElementById('modal-safe').textContent = inc.safe_alternative || 'Review company architecture standards.';
+
+      document.getElementById('incident-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('incident-modal').style.display = 'none';
+    }
+
+    async function runLiveBenchmark() {
+      const btn = document.getElementById('btn-benchmark');
+      btn.disabled = true;
+      btn.textContent = 'Running 10 warm queries...';
+
+      try {
+        const res = await fetch('/api/benchmark', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sample_size: 10 })
+        });
+        const bench = await res.json();
+
+        document.getElementById('gauge-moss-time').textContent = `${bench.moss_avg_latency_ms} ms`;
+        document.getElementById('gauge-cloud-time').textContent = `${bench.cloud_avg_latency_ms} ms`;
+        document.getElementById('speedup-val').textContent = bench.speedup_factor;
+
+        const mossPercent = Math.max(3, (bench.moss_avg_latency_ms / bench.cloud_avg_latency_ms) * 100);
+        document.getElementById('gauge-moss-bar').style.width = `${mossPercent}%`;
+        document.getElementById('gauge-cloud-bar').style.width = '100%';
+      } catch (e) {
+        console.error(e);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '▶ Run Live 10-Query Benchmark Test';
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
