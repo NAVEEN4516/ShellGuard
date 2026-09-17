@@ -23,6 +23,10 @@ DANGEROUS_COMMANDS = [
     ("aws s3api put-bucket-acl --bucket prod --acl public-read", "INC-512"),
     ("git push --force origin main", "INC-770"),
     ("rm -rf /", "INC-204"),
+    ("rm -rf /*", "INC-204"),
+    ("rm -rf --no-preserve-root /", "INC-204"),
+    ("sudo rm -rf /", "INC-204"),
+    ('FOO="destructive test" rm -rf /', "INC-204"),
 ]
 
 SAFE_COMMANDS = [
@@ -31,12 +35,25 @@ SAFE_COMMANDS = [
     "git status",
     "git diff",
     "git log -n 5",
+    "git commit -m 'feat: next-level safety'",
     "kubectl get pods -n production",
     "kubectl describe service web-gateway",
+    "kubectl apply -f ingress-deployment.yaml",
+    "kubectl delete pod test-worker-pod",
     "terraform plan",
     "terraform show",
+    "terraform init",
     "docker ps",
     "docker logs container_123",
+    "docker run -it ubuntu bash",
+    "docker rm stopped_container",
+    "rm file.txt",
+    "rm -f ./test.log",
+    "rm -rf ./build",
+    "aws s3 ls",
+    "helm list",
+    "gcloud compute instances list",
+    "az vm list",
 ]
 
 

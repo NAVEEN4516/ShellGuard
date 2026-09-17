@@ -618,6 +618,8 @@
           <button type="button" class="cmd-chip danger" onclick="setCmd('rm -rf /')">💥 rm -rf /</button>
           <button type="button" class="cmd-chip danger" onclick="setCmd('aws s3api put-bucket-acl --bucket prod --acl public-read')">💥 aws s3 public-read</button>
           <button type="button" class="cmd-chip danger" onclick="setCmd('git push --force origin main')">💥 git push -f main</button>
+          <button type="button" class="cmd-chip danger" onclick="setCmd('redis-cli --cluster reset hard')">💥 redis-cli reset</button>
+          <button type="button" class="cmd-chip danger" onclick="setCmd('vault lease revoke -force -prefix sys/')">💥 vault lease revoke</button>
           <button type="button" class="cmd-chip" onclick="setCmd('kubectl get pods -n production')">✅ kubectl get pods</button>
           <button type="button" class="cmd-chip" onclick="setCmd('terraform plan')">✅ terraform plan</button>
           <button type="button" class="cmd-chip" onclick="setCmd('docker ps')">✅ docker ps</button>
@@ -627,8 +629,9 @@
         <!-- Result Box -->
         <div id="result-box" class="result-alert">
           <div class="alert-header">
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
               <span id="res-badge" class="badge">STATUS</span>
+              <span id="res-env" class="badge" style="display: none; background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); font-size: 0.75rem;"></span>
               <span id="res-title" style="font-weight: 700; font-size: 0.95rem;">Incident Title</span>
             </div>
             <div id="res-latency" class="latency-badge">0.0ms</div>
@@ -641,7 +644,7 @@
             </div>
             <div class="alert-code-box">
               <span id="res-safe-cmd">kubectl rollout restart deployment/ingress-nginx</span>
-              <button class="copy-btn" onclick="copySafeCmd()">Copy</button>
+              <button class="copy-btn" onclick="copySafeCmd(event)">Copy</button>
             </div>
           </div>
         </div>
@@ -822,15 +825,38 @@
       badge.className = 'badge ' + data.status.toLowerCase();
       badge.textContent = data.status;
 
+      const envBadge = document.getElementById('res-env');
+      if (envBadge) {
+        if (data.env_badge) {
+          envBadge.style.display = 'inline-block';
+          envBadge.textContent = data.env_badge;
+        } else {
+          envBadge.style.display = 'none';
+        }
+      }
+
       lat.textContent = `${data.latency_ms} ms`;
 
       if (data.status === 'BLOCKED') {
         title.textContent = `🛑 CRITICAL: Matched ${data.matched_incident_id || 'Safety Policy'}`;
         body.innerHTML = `<strong>Root Cause:</strong> This command was identified as a direct trigger for a catastrophic infrastructure failure. <br><strong>Similarity Score:</strong> ${(data.similarity_score * 100).toFixed(1)}% | <strong>Incident:</strong> ${data.matched_incident_title || ''}`;
         
-        if (data.safe_alternative) {
+        let executableCmd = data.safe_alternative_cmd;
+        if (!executableCmd && data.safe_alternative) {
+          const match = data.safe_alternative.match(/```(?:bash|sh)?\r?\n([\s\S]*?)\r?\n```/i);
+          if (match) {
+            executableCmd = match[1].trim();
+          } else {
+            const lines = data.safe_alternative.split('\n')
+              .map(l => l.trim())
+              .filter(l => l && !l.startsWith('#') && !l.endsWith(':') && !l.startsWith('*') && !/^\d+\./.test(l));
+            executableCmd = lines.join('\n');
+          }
+        }
+
+        if (executableCmd) {
           safeBox.style.display = 'block';
-          safeCmd.textContent = data.safe_alternative.replace(/```(?:bash|sh)?/g, '').replace(/```/g, '').trim().split('\n')[0];
+          safeCmd.textContent = executableCmd;
         } else {
           safeBox.style.display = 'none';
         }
@@ -859,6 +885,7 @@
       item.innerHTML = `
         <div class="feed-cmd">${escapeHtml(data.command)}</div>
         <div class="feed-meta">
+          ${data.env_badge ? `<span style="color: #c084fc; font-size: 0.75rem; font-family: var(--font-mono);">${escapeHtml(data.env_badge)}</span>` : ''}
           <span class="badge ${data.status.toLowerCase()}">${data.status}</span>
           <span style="color: var(--accent-cyan); font-size: 0.8rem;">${data.latency_ms}ms</span>
         </div>
@@ -866,10 +893,35 @@
       list.insertBefore(item, list.firstChild);
     }
 
-    function copySafeCmd() {
-      const text = document.getElementById('res-safe-cmd').textContent;
-      navigator.clipboard.writeText(text);
-      alert('Safe command copied to clipboard!');
+    function fallbackCopy(text) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+      } catch (e) {
+        console.error("Fallback copy failed", e);
+      }
+      document.body.removeChild(textArea);
+    }
+
+    function copySafeCmd(event) {
+      const text = document.getElementById('res-safe-cmd').textContent.trim();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+      } else {
+        fallbackCopy(text);
+      }
+      const btn = (event && event.target) || document.querySelector('.alert-code-box .copy-btn');
+      if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+      }
     }
 
     async function fetchStats() {

@@ -27,29 +27,96 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from daemon.engine import ShellGuardEngine
 from daemon.indexer import load_all_incidents
 
+import json
+import urllib.request
+from typing import Optional, Dict
+
 console = Console(highlight=False)
 
+import os
 
-def check_command(command: str):
-    """Evaluate a single command through the Moss engine with rich terminal output."""
-    console.print(f"[dim]Evaluating command via in-process Moss semantic engine...[/dim]")
-    engine = ShellGuardEngine()
-    engine.initialize()
+def get_auth_token() -> Optional[str]:
+    """Retrieves local authentication token from OS credential store (Keyring/DPAPI) or env."""
+    try:
+        from daemon.security import OSCredentialStore
+        token = OSCredentialStore.retrieve_token()
+        if token:
+            return token
+    except Exception:
+        pass
+    token = os.environ.get("SHELLGUARD_TOKEN")
+    if token and len(token.strip()) >= 16:
+        return token.strip()
+    return None
 
-    res = engine.evaluate(command)
+def get_auth_headers() -> Dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    token = get_auth_token()
+    if token:
+        headers["X-ShellGuard-Token"] = token
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
 
-    if res.status == "BLOCKED":
+def check_command(command: str, daemon_url: Optional[str] = None):
+    """
+    Evaluate a single command.
+    Queries the local running daemon via HTTP (<10ms) first,
+    falling back to in-process Moss engine initialization if daemon is offline.
+    """
+    if not daemon_url:
+        daemon_url = os.environ.get("SHELLGUARD_DAEMON_URL", "http://127.0.0.1:8080/api/check")
+    if not daemon_url.endswith("/api/check"):
+        daemon_url = daemon_url.rstrip("/") + "/api/check"
+
+    cwd = os.getcwd()
+    res_data = None
+    engine_desc = "Daemon HTTP"
+
+    try:
+        req_payload = json.dumps({"command": command, "cwd": cwd, "shell": "cli"}).encode("utf-8")
+        req = urllib.request.Request(
+            daemon_url,
+            data=req_payload,
+            headers=get_auth_headers(),
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=0.4) as response:
+            if response.status == 200:
+                res_data = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        res_data = None
+
+    if res_data is None:
+        console.print(f"[dim]ShellGuard daemon offline. Evaluating command via in-process Moss semantic engine...[/dim]")
+        engine = ShellGuardEngine()
+        engine.initialize()
+        res = engine.evaluate(command, cwd=cwd)
+        res_data = res.to_dict()
+        engine_desc = "Moss In-Memory Runtime"
+
+    status = res_data.get("status", "PASSED")
+    latency_ms = res_data.get("latency_ms", 0.0)
+    matched_id = res_data.get("matched_incident_id")
+    matched_title = res_data.get("matched_incident_title")
+    sim_score = res_data.get("similarity_score", 0.0)
+    blast = res_data.get("blast_radius")
+    safe_alt = res_data.get("safe_alternative_cmd") or res_data.get("safe_alternative")
+    rec = res_data.get("recommendation")
+    env_badge = res_data.get("env_badge")
+    env_line = f"[yellow]Environment:[/yellow] [bold magenta]{env_badge}[/bold magenta]\n" if env_badge else ""
+
+    if status == "BLOCKED":
         content = f"""[bold red]EXECUTION PREVENTED[/bold red]
 
-[yellow]Incident Match:[/yellow] {res.matched_incident_id} - {res.matched_incident_title}
-[yellow]Similarity Score:[/yellow] {res.similarity_score * 100:.1f}%
-[yellow]Retrieval Latency:[/yellow] [bold cyan]{res.latency_ms} ms[/bold cyan] (Moss In-Memory Runtime)
+{env_line}[yellow]Incident Match:[/yellow] {matched_id} - {matched_title}
+[yellow]Similarity Score:[/yellow] {sim_score * 100:.1f}%
+[yellow]Retrieval Latency:[/yellow] [bold cyan]{latency_ms} ms[/bold cyan] ({engine_desc})
 
 [bold white]Blast Radius:[/bold white]
-{res.blast_radius or 'Catastrophic infrastructure downtime.'}
+{blast or 'Catastrophic infrastructure downtime.'}
 
 [bold green]Mandatory Safe Alternative:[/bold green]
-{res.safe_alternative or 'Refer to internal architecture runbook.'}
+{safe_alt or 'Refer to internal architecture runbook.'}
 """
         panel = Panel(
             content,
@@ -60,11 +127,11 @@ def check_command(command: str):
         console.print(panel)
         sys.exit(1)
 
-    elif res.status == "WARNING":
+    elif status == "WARNING":
         content = f"""[bold yellow]HIGH RISK COMMAND DETECTED[/bold yellow]
 
-[yellow]Notice:[/yellow] {res.recommendation}
-[yellow]Retrieval Latency:[/yellow] [bold cyan]{res.latency_ms} ms[/bold cyan]
+{env_line}[yellow]Notice:[/yellow] {rec}
+[yellow]Retrieval Latency:[/yellow] [bold cyan]{latency_ms} ms[/bold cyan] ({engine_desc})
 """
         panel = Panel(
             content,
@@ -74,7 +141,72 @@ def check_command(command: str):
         )
         console.print(panel)
     else:
-        console.print(f"[bold green]PASSED[/bold green] ({res.latency_ms} ms) - [dim]Command verified safe to execute.[/dim]")
+        badge_str = f" [bold magenta]{env_badge}[/bold magenta]" if env_badge else ""
+        console.print(f"[bold green]PASSED[/bold green]{badge_str} ({latency_ms} ms) - [dim]Command verified safe to execute ({engine_desc}).[/dim]")
+
+
+def learn_command(target: str, daemon_url: Optional[str] = None):
+    """
+    Dynamically learn from an incident post-mortem markdown file or string.
+    Posts to the local running daemon via HTTP, falling back to in-process Moss engine.
+    """
+    if not daemon_url:
+        daemon_url = os.environ.get("SHELLGUARD_DAEMON_URL", "http://127.0.0.1:8080/api/incidents")
+    if not daemon_url.endswith("/api/incidents"):
+        daemon_url = daemon_url.rstrip("/") + "/api/incidents"
+
+    p = Path(target)
+    payload = {}
+    if p.exists() and p.is_file():
+        payload["file_path"] = str(p.resolve())
+    else:
+        payload["markdown"] = target
+
+    res_data = None
+    engine_desc = "Daemon HTTP"
+
+    try:
+        req_payload = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            daemon_url,
+            data=req_payload,
+            headers=get_auth_headers(),
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=2.0) as response:
+            if response.status in (200, 201):
+                res_data = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        res_data = None
+
+    if res_data is None:
+        console.print("[dim]ShellGuard daemon offline. Learning incident via in-process Moss semantic engine...[/dim]")
+        engine = ShellGuardEngine()
+        engine.initialize()
+        res_data = engine.learn_incident(target)
+        engine_desc = "Moss In-Memory Runtime"
+
+    inc_id = res_data.get("incident_id", "UNKNOWN")
+    title = res_data.get("title", "")
+    chunks = res_data.get("chunks_added", 0)
+    total = res_data.get("total_docs", 0)
+
+    content = f"""[bold green]DISASTER POST-MORTEM LEARNED & INDEXED[/bold green]
+
+[yellow]Incident ID:[/yellow] {inc_id}
+[yellow]Title:[/yellow] {title}
+[yellow]Chunks Added:[/yellow] [bold cyan]{chunks}[/bold cyan]
+[yellow]Total Active Index Chunks:[/yellow] [bold cyan]{total}[/bold cyan] ({engine_desc})
+
+[dim]The triggering command pattern is now dynamically intercepted with zero downtime.[/dim]
+"""
+    panel = Panel(
+        content,
+        title="[bold green][+] SHELLGUARD DYNAMIC LEARNING[/bold green]",
+        border_style="green",
+        expand=False,
+    )
+    console.print(panel)
 
 
 def list_incidents():
@@ -155,6 +287,7 @@ def main():
     # check
     check_p = subparsers.add_parser("check", help="Evaluate a shell command")
     check_p.add_argument("command", type=str, help="Command to evaluate")
+    check_p.add_argument("--url", type=str, default=None, help="Daemon URL endpoint")
 
     # incidents
     subparsers.add_parser("incidents", help="List all loaded post-mortems")
@@ -168,10 +301,17 @@ def main():
     daemon_p.add_argument("--host", type=str, default="127.0.0.1")
     daemon_p.add_argument("--port", type=int, default=8080)
 
+    # learn
+    learn_p = subparsers.add_parser("learn", help="Dynamically learn from an incident post-mortem markdown file or string")
+    learn_p.add_argument("target", type=str, help="Path to incident markdown file or markdown string")
+    learn_p.add_argument("--url", type=str, default=None, help="Daemon URL endpoint")
+
     args = parser.parse_args()
 
     if args.subcommand == "check":
-        check_command(args.command)
+        check_command(args.command, args.url)
+    elif args.subcommand == "learn":
+        learn_command(args.target, args.url)
     elif args.subcommand == "incidents":
         list_incidents()
     elif args.subcommand == "benchmark":

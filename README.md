@@ -6,24 +6,28 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org)
-[![Moss Runtime](https://img.shields.io/badge/Retrieval%20Latency-5.8ms%20p50-brightgreen.svg)](https://moss.dev)
-[![Tests: 29 Passed](https://img.shields.io/badge/Tests-29%20Passed-success.svg)](#testing)
+[![Moss Runtime](https://img.shields.io/badge/Retrieval%20Latency-3.7ms%20p50-brightgreen.svg)](https://moss.dev)
+[![Tests: 167 Passed](https://img.shields.io/badge/Tests-167%20Passed%20(100%25)-success.svg)](#testing)
+[![LiveKit WebRTC](https://img.shields.io/badge/LiveKit-WebRTC%20Audio%20%26%20War%20Rooms-blueviolet.svg)](#livekit-integration)
+[![Next.js 14](https://img.shields.io/badge/Next.js-14%20Local%20Cockpit-black.svg)](#nextjs-local-cockpit)
+[![Memory Footprint](https://img.shields.io/badge/RSS%20Memory-33.9MB%20(%3C250MB)-blue.svg)](#tiered-memory)
 [![Zero Network Hops](https://img.shields.io/badge/Network%20Hops-0%20(In--Process)-cyan.svg)](#architecture)
 
 ---
 
 ## 🎯 What is ShellGuard?
 
-**ShellGuard** is an invisible, real-time safety net for developers and SREs. It intercepts shell commands at the keystroke level and semantically verifies them against your organization's historical incident post-mortems and architecture rules in **< 10ms** before they execute.
+**ShellGuard** is an invisible, real-time safety net for developers and SREs. It intercepts shell commands at the keystroke level and semantically verifies them against your organization's historical incident post-mortems and architecture rules in **< 10ms (3.7ms p50)** before they execute.
 
 ```
 $ kubectl delete namespace ingress-nginx [Enter]
 
-🛑 [SHELLGUARD BLOCKED] EXECUTION HALTED
+🛑 [SHELLGUARD BLOCKED] EXECUTION HALTED [ENV: prod-us-east-1 (k8s)]
 Incident Match: INC-402 — Production Ingress Namespace Deletion (100% match)
-Retrieval Latency: 5.8ms (Moss In-Process Runtime)
+Retrieval Latency: 3.7ms (Moss In-Process Runtime)
 Blast Radius: 48 edge microservices wiped out; 4-hour customer traffic drop.
 Safe Alternative: kubectl rollout restart deployment/ingress-nginx-controller -n ingress-nginx
+🔊 Emergency LiveKit WebRTC Audio Chime Dispatched (880Hz) | War Room: shellguard-warroom-inc-402
 ```
 
 ---
@@ -35,9 +39,9 @@ Traditional AI copilots rely on cloud vector databases (Pinecone, Qdrant, Supaba
 | Engine | Network Hops | p50 Query Latency | Terminal Experience | Offline Capable? |
 | :--- | :---: | :---: | :---: | :---: |
 | **Traditional Cloud Vector DB** | 2–3 remote hops | $246.4\text{ ms}$ | Laggy, irritating | ❌ No |
-| **ShellGuard (Moss Runtime)** | **0 (In-Process RAM)** | **$5.86\text{ ms}$** | **Instantaneous / Ambient** | **✅ 100% Offline** |
+| **ShellGuard (Moss Runtime)** | **0 (In-Process RAM)** | **$3.72\text{ ms}$** | **Instantaneous / Ambient** | **✅ 100% Offline** |
 
-> **Result:** ShellGuard runs **38x–70x faster** than cloud-hosted vector solutions.
+> **Result:** ShellGuard runs **65x faster** than cloud-hosted vector solutions.
 
 ---
 

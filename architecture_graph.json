@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "ShellGuard Architecture Graph",
+  "version": "2.0.0",
+  "description": "Structured system topology graph for ShellGuard with explicit port definitions and labeled edges.",
+  "nodes": [
+    {
+      "id": "interactive-terminal",
+      "name": "Developer Terminal",
+      "type": "client",
+      "description": "Interactive terminal session (Zsh, Bash, Windows PowerShell)",
+      "ports": [
+        {"id": "out-cmd", "name": "Command Egress", "direction": "out", "protocol": "ipc"},
+        {"id": "in-feedback", "name": "Interception Feedback", "direction": "in", "protocol": "stdout"}
+      ]
+    },
+    {
+      "id": "shell-hook",
+      "name": "ShellGuard Hook",
+      "type": "interceptor",
+      "description": "Preexec / PSReadLine keyhandler transparent interception layer",
+      "ports": [
+        {"id": "in-cmd", "name": "Raw Keystroke Ingress", "direction": "in", "protocol": "ipc"},
+        {"id": "out-bypass", "name": "Deterministic Safe Bypass", "direction": "out", "protocol": "kernel-exec"},
+        {"id": "out-eval", "name": "Evaluation Request", "direction": "out", "protocol": "http-post"}
+      ]
+    },
+    {
+      "id": "shellguard-daemon",
+      "name": "ShellGuard Daemon",
+      "type": "service",
+      "description": "FastAPI background daemon with embedded Moss engine, OWASP security, and LiveKit WebRTC bridge",
+      "ports": [
+        {
+          "id": "in-http",
+          "name": "Local REST & SSE API Port",
+          "direction": "in",
+          "protocol": "http",
+          "portNumber": 8080,
+          "description": "Protected API for command safety checks, metrics, and incident hot-reloading"
+        },
+        {
+          "id": "in-shell",
+          "name": "Hook Interception Port",
+          "direction": "in",
+          "protocol": "ipc",
+          "description": "Direct loopback socket for low-latency terminal checks"
+        },
+        {
+          "id": "out-db",
+          "name": "Incident DB & Storage Port",
+          "direction": "out",
+          "protocol": "filesystem",
+          "description": "Access port for loading markdown disaster post-mortems and persisting local config/cache"
+        },
+        {
+          "id": "out-webrtc",
+          "name": "LiveKit WebRTC Egress",
+          "direction": "out",
+          "protocol": "webrtc-signaling",
+          "description": "Emits emergency WebRTC audio chimes and SRE collaborative war room tokens"
+        },
+        {
+          "id": "out-trace",
+          "name": "OpenTelemetry OTLP Collector",
+          "direction": "out",
+          "protocol": "grpc-otlp",
+          "portNumber": 4318,
+          "description": "Exports W3C TraceContext spans and local latency distributions"
+        }
+      ]
+    },
+    {
+      "id": "local-configs",
+      "name": "Local Storage & Incident DB",
+      "type": "storage",
+      "description": "Immutable disaster post-mortems (data/incidents/), OS credential store, and telemetry SQLite cache",
+      "ports": [
+        {
+          "id": "in-fs",
+          "name": "Filesystem Interface",
+          "direction": "in",
+          "protocol": "file-io",
+          "description": "Read/write channel for post-mortem chunks and local configurations"
+        }
+      ]
+    },
+    {
+      "id": "nextjs-cockpit",
+      "name": "Next.js Local Web Cockpit",
+      "type": "frontend",
+      "description": "Next.js 14 App Router dashboard with Live Radar Feed, Command Simulator, and LiveKit War Room",
+      "ports": [
+        {"id": "in-ui", "name": "HTTP UI Port", "direction": "in", "protocol": "http", "portNumber": 8080},
+        {"id": "in-webrtc-audio", "name": "LiveKit Audio Ingress", "direction": "in", "protocol": "webrtc"}
+      ]
+    },
+    {
+      "id": "livekit-server",
+      "name": "LiveKit Cloud / Local Server",
+      "type": "external-service",
+      "description": "WebRTC real-time SFU media server for multi-user war rooms",
+      "ports": [
+        {"id": "in-jwt", "name": "Token Verification & Room Connect", "direction": "in", "protocol": "webrtc"}
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e001-term-to-hook",
+      "source": "interactive-terminal",
+      "sourcePort": "out-cmd",
+      "target": "shell-hook",
+      "targetPort": "in-cmd",
+      "label": "Keystroke capture on Enter (<0.01ms)"
+    },
+    {
+      "id": "e002-hook-to-daemon",
+      "source": "shell-hook",
+      "sourcePort": "out-eval",
+      "target": "shellguard-daemon",
+      "targetPort": "in-http",
+      "label": "POST /api/check with X-ShellGuard-Token (<0.3ms)"
+    },
+    {
+      "id": "b619cd0e-bc97-4572-adf3-87d3c8d74917",
+      "source": "shellguard-daemon",
+      "sourcePort": "out-db",
+      "target": "local-configs",
+      "targetPort": "in-fs",
+      "label": "Write/Update Configs",
+      "description": "Writes and synchronizes local configurations, telemetry cache, and incident post-mortems"
+    },
+    {
+      "id": "e003-daemon-to-webrtc",
+      "source": "shellguard-daemon",
+      "sourcePort": "out-webrtc",
+      "target": "livekit-server",
+      "targetPort": "in-jwt",
+      "label": "Provisions JWT room token & audio chime payload"
+    },
+    {
+      "id": "e004-daemon-to-cockpit",
+      "source": "shellguard-daemon",
+      "sourcePort": "in-http",
+      "target": "nextjs-cockpit",
+      "targetPort": "in-ui",
+      "label": "Static HTML/JS export serving & telemetry feed"
+    },
+    {
+      "id": "e005-daemon-to-hook-halt",
+      "source": "shellguard-daemon",
+      "sourcePort": "in-http",
+      "target": "shell-hook",
+      "targetPort": "out-eval",
+      "label": "Returns BLOCKED/WARNING decision & safe alternative"
+    }
+  ]
+}
