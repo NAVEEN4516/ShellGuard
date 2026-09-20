@@ -26,7 +26,6 @@ Thumbs.db
 # Node / Next.js
 node_modules/
 .next/
-dashboard/out/
 *.log
 
 # ShellGuard local secrets
