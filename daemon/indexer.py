@@ -10,7 +10,64 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
 
-import moss_core
+try:
+    import moss_core
+except Exception as _moss_err:
+    logger.warning(f"Native moss_core unavailable ({_moss_err}), using in-process lexical shim.")
+
+    class DocumentInfo:
+        def __init__(self, id: str, text: str, payload: str = ""):
+            self.id = id
+            self.text = text
+            self.payload = payload
+
+    class QueryResult:
+        def __init__(self, doc_id: str, score: float, payload: str = ""):
+            self.id = doc_id
+            self.score = score
+            self.payload = payload
+
+    class LocalIndexManager:
+        def __init__(self):
+            self._indices: Dict[str, List[DocumentInfo]] = {}
+
+        def has_index(self, name: str) -> bool:
+            return name in self._indices
+
+        def delete_index(self, name: str):
+            self._indices.pop(name, None)
+
+        def create_index(self, name: str, docs: List[DocumentInfo], model_id: str):
+            self._indices[name] = list(docs)
+
+        def add_documents(self, name: str, docs: List[DocumentInfo]):
+            if name not in self._indices:
+                self._indices[name] = []
+            self._indices[name].extend(docs)
+
+        def query(self, name: str, query_text: str, top_k: int = 3) -> List[QueryResult]:
+            if name not in self._indices:
+                return []
+            docs = self._indices[name]
+            q_words = set(re.findall(r"\w+", query_text.lower()))
+            if not q_words:
+                return []
+            scored = []
+            for d in docs:
+                d_words = set(re.findall(r"\w+", d.text.lower()))
+                overlap = len(q_words & d_words)
+                total = len(q_words | d_words) or 1
+                jaccard = overlap / total
+                score = min(0.99, max(0.1, jaccard * 1.5))
+                scored.append(QueryResult(d.id, score, d.payload))
+            scored.sort(key=lambda x: x.score, reverse=True)
+            return scored[:top_k]
+
+    class _MossCoreShim:
+        DocumentInfo = DocumentInfo
+        LocalIndexManager = LocalIndexManager
+
+    moss_core = _MossCoreShim()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("shellguard.indexer")

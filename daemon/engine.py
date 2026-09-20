@@ -12,7 +12,10 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Union, Set
 from dataclasses import dataclass, field, asdict
 
-import moss_core
+try:
+    import moss_core
+except Exception:
+    from daemon.indexer import moss_core
 from daemon.context import ContextDetector
 from daemon.indexer import (
     build_index,
