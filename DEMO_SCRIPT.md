@@ -1,63 +1,108 @@
-# ShellGuard: 2-Minute Video Demo Script
+# 🎬 ShellGuard: The Championship 2-Minute Demo Video Script & Screenplay
 **Competition:** YC Fall 2026 × Moss: The Zero Latency Builder Sprint  
 **Track:** Track 04 — Local-First AI & The Small Cloud  
-**Duration:** Exactly 2 minutes (120 seconds)  
+**Target Prizes:** 🥇 Best Storytelling Video | 🥇 Best Use Case of Moss | 🥇 Best Presentation & Demo  
+**Exact Duration:** 120 Seconds (2:00 Minutes)  
+**Style:** Fast-paced, high-intensity SRE thriller meets YC Demo Day pitch.
 
 ---
 
-## Shot 1: The Hook & The Problem (0:00 - 0:25)
-* **Visual:** Close-up of an SRE terminal at 2:00 AM. Terminal prompt shows `production-us-east-1`.
-* **Voiceover:**
-  > "Every SRE and DevOps engineer has lived through this nightmare: You are debugging a stuck ingress pod under pressure. You type `kubectl delete namespace ingress-nginx`, hit Enter... and immediately realize you just nuked production edge routing for the entire company.
-  > 
-  > Why does this happen? Because company post-mortems and safety rules are trapped in slow Confluence pages or cloud docs. If you used traditional cloud AI to check every keystroke, a 300ms cloud vector round-trip would make your terminal unbearable to use."
+## ⏱️ Timeline Breakdown
+
+| Time | Scene / Shot | Visual On Screen | Audio / Narration | Key Hackathon Hook |
+| :---: | :--- | :--- | :--- | :--- |
+| **0:00 - 0:25** | **Act I: The 2:00 AM Nightmare** | Full-screen dark terminal. Prompt: `[prod-us-east-1]`. Engineer furiously typing. | *"It’s 2:00 AM. Production is dropping packets..."* | Universal SRE pain point |
+| **0:25 - 0:50** | **Act II: The Moss Moat** | Split screen: Terminal + Next.js Cockpit. Speedometer showing 3.7ms vs 246ms. | *"Why can't traditional AI solve this? The 300ms cloud lag..."* | Why Moss is mandatory |
+| **0:50 - 1:25** | **Act III: Live Demo & Stack** | Keystroke intercepted. LiveKit 880Hz alert chime plays. War Room spawns. | *"Watch this: kubectl delete ns ingress-nginx..."* | LiveKit + Next.js + Moss |
+| **1:25 - 1:45** | **Act IV: Enterprise Scale & Air-Gap** | Wi-Fi turned OFF (Airplane Mode). 100% offline blocking. Policy sync & mTLS SIEM. | *"Even with Wi-Fi completely disconnected..."* | Zero-leakage + Fleet Scale |
+| **1:45 - 2:00** | **Act V: The YC Closer** | Logo, GitHub link, and high-energy pitch conclusion. | *"When retrieval is sub-10ms, AI stops being a chat box..."* | Unforgettable final impression |
 
 ---
 
-## Shot 2: Introducing ShellGuard & The Moss Moat (0:25 - 0:45)
-* **Visual:** Switch to split-screen showing the terminal on the left and the **ShellGuard Web Cockpit** on the right at `http://localhost:8080`.
-* **Voiceover:**
-  > "Meet **ShellGuard**: the zero-latency, local-first terminal interceptor built on **Moss**.
+## 🎥 Shot-by-Shot Script & Director's Notes
+
+### ACT I: The Hook & The Nightmare (0:00 - 0:25)
+* **Visual:** Close-up of an interactive terminal in dark mode. The prompt clearly shows `[ENV: prod-us-east-1]`.
+* **Sound Effect:** Subdued ticking clock / ambient server hum.
+* **Narration (Intense, relatable):**
+  > "Every DevOps engineer and SRE has lived through this exact nightmare.
   > 
-  > Instead of querying an external vector database over the internet, ShellGuard loads historical disaster post-mortems and architecture rules directly into local memory.
+  > It’s 2:00 AM. Your site is suffering an outage. You’re trying to restart a stuck ingress controller. Under pressure, you type:
+  > `kubectl delete namespace ingress-nginx`... hit Enter... and immediately realize you just obliterated edge routing for the entire company.
   > 
-  > Using Moss's in-process Rust runtime, semantic checks take **under 6 milliseconds**—completely imperceptible to the human developer, until it saves the company."
+  > Why does this keep happening? Because your company’s incident post-mortems and safety rules are buried in slow Confluence pages that nobody reads during a crisis."
 
 ---
 
-## Shot 3: The Live Interception Demo (0:45 - 1:15)
-* **Visual:** In the terminal, run `kubectl get pods -n production`.
-* **Action:** The command executes instantly in 0.01ms.
-* **Voiceover:**
-  > "Safe, diagnostic commands like `kubectl get pods` bypass with zero overhead in five microseconds."
-* **Action:** Now type `kubectl delete namespace ingress-nginx` and hit Enter.
-* **Visual:** INSTANT RED ALERT in terminal and Web Cockpit simultaneously.
-  * Terminal flashes: `🛑 [SHELLGUARD BLOCKED] EXECUTION PREVENTED`
-  * Displays: `Matched Incident #402 (100% similarity) in 5.8ms`
-  * Shows Blast Radius: `48 microservices routing wiped out`
-  * Shows Safe Alternative: `kubectl rollout restart deployment/ingress-nginx-controller`
-* **Voiceover:**
-  > "Boom! The moment you hit Enter, ShellGuard intercepts the command in 5.8 milliseconds. It maps the destructive intent against Incident #402, aborts execution before the Kubernetes API is touched, and hands you the pre-flight verified rolling restart command."
+### ACT II: Why Cloud AI Fails & The Moss Moat (0:25 - 0:50)
+* **Visual:** Cut to split-screen: Terminal on the left, **ShellGuard Next.js Cockpit** on the right (`http://localhost:8080`).
+* **Visual Highlight:** Zoom into the **Latency Gauge Speedometer** showing **Moss at 3.7ms** vs **Cloud Vector DB at 246ms (65x faster)**.
+* **Narration (Confident, authoritative):**
+  > "Why hasn't cloud AI solved this? Because traditional RAG copilots rely on remote cloud vector databases.
+  > 
+  > A 300-millisecond round-trip over WAN creates unbearable keystroke lag. In an interactive terminal, 300 milliseconds feels completely broken—so engineers just turn it off.
+  > 
+  > Meet **ShellGuard**: an in-process, zero-latency terminal interceptor powered by **Moss**.
+  > 
+  > Instead of sending keystrokes across the internet, ShellGuard embeds Moss's Rust SIMD vector core directly inside workstation RAM. Semantic retrieval takes **3.7 milliseconds**—completely imperceptible to the developer, until it saves the company."
 
 ---
 
-## Shot 4: Live Latency Benchmark & Local-First Proof (1:15 - 1:45)
-* **Visual:** Click "Run Live 10-Query Benchmark Test" in the Web Cockpit.
-* **Visual:** Watch the live gauge animate:
-  * Moss in-process: **5.8 ms**
-  * Cloud Vector DB baseline: **246.4 ms**
-  * Callout: **40x Faster | Zero Network Hops | 100% Offline**
-* **Action:** Turn off Wi-Fi (Airplane mode) and run `rm -rf /`. It blocks in 3.7ms offline!
-* **Voiceover:**
-  > "Look at our live benchmark: Moss runs at 5.8 milliseconds—over 40 times faster than Pinecone or Qdrant.
-  > 
-  > And because it's built for Track 4, it is 100% local-first. We can unplug the internet completely, and your internal code, passwords, and incident memory never leave your laptop."
+### ACT III: The Live Demo & Full Stack Showcase (0:50 - 1:25)
+* **Action 1 (Benign Bypass):** Type `kubectl get pods -n production` and hit Enter.
+  * **Visual:** Command executes in 0.005 milliseconds with zero delay.
+  * **Narration:** *"Safe commands like `kubectl get` bypass with zero overhead in five microseconds."*
+* **Action 2 (Destructive Interception):** Now type `kubectl delete namespace ingress-nginx` and hit Enter!
+  * **Visual:** 
+    1. **Terminal:** Instantly flashes RED:
+       ```
+       🛑 [SHELLGUARD BLOCKED] EXECUTION PREVENTED [ENV: prod-us-east-1 (k8s)]
+       Incident Match: INC-402 — Production Ingress Deletion (94.2% match)
+       Retrieval Latency: 3.7ms (Moss In-Process Runtime)
+       Blast Radius: 48 edge microservices wiped out; 4-hour downtime.
+       Safe Alternative: kubectl rollout restart deployment/ingress-nginx-controller
+       ```
+    2. **Sound:** Clear, crisp **880Hz LiveKit Emergency Chime** plays from the browser!
+    3. **Next.js Cockpit:** A glowing red incident card slides in on the live radar stream. The **LiveKit War Room** automatically provisions `shellguard-warroom-inc-402` with collaborative WebRTC audio.
+  * **Narration (High energy):**
+    > "Boom! The millisecond you press Enter, ShellGuard halts execution before the Kubernetes API is ever touched.
+    > 
+    > It semantically matches Incident 402, displays the blast radius, hands you the verified safe rolling restart command, fires an emergency **LiveKit WebRTC audio alert**, and provisions an instant SRE War Room for your team!"
 
 ---
 
-## Shot 5: Conclusion & The Vision (1:45 - 2:00)
-* **Visual:** Return to full camera / logo graphic with GitHub URL.
-* **Voiceover:**
-  > "ShellGuard proves that when retrieval is under 10 milliseconds, AI stops being a slow chat window and becomes an invisible, real-time safety layer for developers.
+### ACT IV: Air-Gapped Local-First & Enterprise Scalability (1:25 - 1:45)
+* **Action:** Toggle **Airplane Mode ON** (Wi-Fi disconnected). Run `terraform destroy -auto-approve`.
+* **Visual:** Blocks in **3.7ms** completely offline!
+* **Visual Highlight:** Flash brief graphic showing:
+  - **HMAC-SHA256 Signed Delta Policy Sync** (< 50ms hot-indexing across developer fleets)
+  - **mTLS SIEM Telemetry Forwarder** (out-of-band enqueueing in 0.008ms)
+  - **Tiered LRU Memory Manager** (Strictly 33.9MB RSS, guaranteed < 250MB memory ceiling)
+* **Narration:**
+  > "And because it’s built for Track 4: Local-First AI, watch this: I’m turning Wi-Fi completely OFF.
   > 
-  > ShellGuard: Zero latency. Zero cloud leakage. Zero downtime. Built for the YC Fall 2026 Moss Sprint."
+  > ShellGuard still blocks in 3.7 milliseconds! Zero external network sockets. Zero telemetry leaks. Your company's sensitive commands, infrastructure secrets, and post-mortems never leave your laptop.
+  > 
+  > And for enterprise fleets: cryptographically signed policy sync, mTLS SIEM forwarding, and tiered LRU memory keeping RAM at an ultra-lean 34 megabytes."
+
+---
+
+### ACT V: The Grand Finale & The Vision (1:45 - 2:00)
+* **Visual:** Clean full-screen graphic showing:
+  - **ShellGuard** logo
+  - **167 / 167 Tests Passing (100%)**
+  - **GitHub:** `github.com/NAVEEN4516/ShellGuard`
+  - Badges: `Moss Core` | `LiveKit WebRTC` | `Next.js 14` | `Windows DPAPI`
+* **Narration (Inspiring, punchy):**
+  > "ShellGuard proves that when retrieval latency drops under 10 milliseconds, AI stops being an annoying chat window and becomes an invisible, ambient safety layer for every developer on Earth.
+  > 
+  > **ShellGuard: Zero latency. Zero cloud leakage. Zero downtime.**
+  > Built for the YC Fall 2026 Moss Sprint by Team BackSync. Thank you!"
+
+---
+
+## 🎙️ Recording Tips for Maximum Impact
+1. **Audio Quality:** Use a clean microphone. Let the LiveKit 880Hz alert chime ring clearly when the command is blocked!
+2. **Screen Resolution:** Record at 1080p (1920x1080) with terminal font size set to 16px–18px so judges on laptops can read every line clearly.
+3. **Pacing:** Keep your voice energetic, crisp, and fast-paced. Do not pause or hesitate during the command execution.
+4. **The Wi-Fi Disconnect:** Showing the Wi-Fi icon turning off while the interception still blocks in 3.7ms is the **ultimate visual proof** of Track 04 Local-First AI!
